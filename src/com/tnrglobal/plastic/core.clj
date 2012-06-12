@@ -18,6 +18,15 @@
 ;; Elasticsearch client
 (def ^:dynamic *CLIENT* nil)
 
+;; Seach types
+(def SEARCH-TYPES
+  {:dfs-query-and-fetch SearchType/DFS_QUERY_AND_FETCH
+   :dfs-query-then-fetch SearchType/DFS_QUERY_THEN_FETCH
+   :query-and-fetch SearchType/QUERY_AND_FETCH
+   :query-then-fetch SearchType/QUERY_THEN_FETCH
+   :count SearchType/COUNT
+   :scan SearchType/SCAN})
+
 (defn client
   "Returns the currently cached Elasticsearch client or creates a new
   one."
@@ -37,8 +46,8 @@
 (def ^:dynamic *CLIENT* nil)
 
 (defmacro with-client
-  "Instantiates a new Elasticsearch TransportClient and then evaluates
-  the provided forms. When the evaluation is complete, the
+  "Evaluates the provided forms in the context of the specified
+  Elasticsearch client. When the evaluation is complete, the
   Elasticsearch client is closed."
   [client & body]
   `(binding [*CLIENT* ~client]
@@ -209,8 +218,7 @@
 
      ;; get the next batch of hits
      (let [response (.get (.execute
-                           (.setScroll (.prepareSearchScroll *CLIENT* scroll-id)
-                                       10)))
+                           (.prepareSearchScroll *CLIENT* scroll-id)))
            hits (.hits response)
            total-hits (.totalHits hits)
            count-hits (count (.hits hits))
@@ -229,25 +237,38 @@
 (defn scroll
   "Runs the provided query on the specified index, if types are
   specified then only documents with a matching type will be
-  returned. This function will open a 'scroll' on the Elasticsearch
-  cluster, the sequence stored under the :hits key will be lazy. By
-  default the results are provided in pages of ten, in the :hits map
-  under the :hits key contains a sequence and each document in the
-  sequence will be ten documents long or less.
+  returned. The query is represent by a map, it may contain the
+  following keys: 'query', 'facets', and 'filter'. This function will
+  open a 'scroll' on the Elasticsearch cluster, the sequence stored
+  under the :hits key will be lazy. By default the results are
+  provided in pages of ten, in the :hits map under the :hits key
+  contains a sequence and each document in the sequence will be ten
+  documents long or less.
 
   Note that when you scroll over a result set, you need to keep the
   client connection open (complete all processing within a
   '(with-client ...)' form."
-  ([index query] (scroll index query []))
-  ([index query types]
+  ([index query-map] (scroll index query-map []))
+  ([index query-map types]
      (let [indices (if (coll? index) index [index])
            builder (.prepareSearch *CLIENT* (into-array indices))]
 
+       ;; set search type
+       (.setScroll builder "120s")
+
        ;; set our query
-       (.setQuery builder (generate-smile query))
+       (.setQuery builder (generate-smile (:query query-map)))
+
+       ;; set facets
+       (if (:facets query-map)
+         (.setFacets builder (generate-smile (:facets query-map))))
+
+       ;; set filter
+       (if (:filter query-map)
+         (.setFacets builder (generate-smile (:filter query-map))))
 
        ;; set to scroll results
-       (.setScroll builder 10)
+       (.setSize builder 10)
 
        ;; handle types
        (if (seq types)
@@ -273,15 +294,18 @@
 
 (defn search
   "Runs the provided query on the specified index, if types are
-  specified then only documents with a matching type will be returned. By
-  default the results are provided in pages of ten, in the :hits map
-  under the :hits key contains a sequence and each document in the
-  sequence will be ten documents long or less. You may provide a map of
-  optional values, these include...
+  specified then only documents with a matching type will be
+  returned. The query is represent by a map, it may contain the
+  following keys: 'query', 'facets', and 'filter'. Each key should
+  contain a map value. By default the results are provided in pages of
+  ten, in the :hits map under the :hits key contains a sequence and
+  each document in the sequence will be ten documents long or
+  less. You may provide a map of optional values, these include...
 
     :size  The size of result pages, defaults to 10
     :from  The page of results from which hits will be returned
-    :lazy  Setting this loads only one page non-lazily
+    :lazy  Setting this loads only one page lazily, false
+    :type  The type of search, a key into SEARCH-TYPES map
 
   This function will handle paging automatically, returning a lazy
   sequence under the :hits key. By default this function will fetch
@@ -290,17 +314,30 @@
   provided). Note that when you page over a result set lazily, you
   need to keep the client connection open (complete all processing
   within a '(with-client ...)' form."
-  ([index query] (search index query []))
-  ([index query types & {:keys [from size lazy] :or {from 0 size 10 lazy 1}}]
+  ([index query-map] (search index query-map []))
+  ([index query-map types & {:keys [from size lazy type]
+                             :or {from 0 size 10 lazy false
+                                  type :query-then-fetch}}]
      (let [indices (if (coll? index) index [index])
            builder (.prepareSearch *CLIENT* (into-array indices))]
 
        ;; set our query
-       (.setQuery builder (generate-smile query))
+       (.setQuery builder (generate-smile (:query query-map)))
+
+       ;; set facets
+       (if (:facets query-map)
+         (.setFacets builder (generate-smile (:facets query-map))))
+
+       ;; set filter
+       (if (:filter query-map)
+         (.setFacets builder (generate-smile (:filter query-map))))
 
        ;; handle types
        (if (seq types)
          (.setTypes builder (into-array types)))
+
+       ;; set search type
+       (.setSearchType builder (SEARCH-TYPES type))
 
        ;; set our size and page
        (.setSize builder size)
@@ -317,13 +354,14 @@
 
                   ;; return a lazy sequence of our hits (each item a
                   ;; chunk of hits)
-                  {:hits
-                   (lazy-seq
-                     (cons (into [] (doall (for [hit hits] (hit-map hit))))
-                           (if (and lazy (> total-hits hits-collected))
-                             (:hits (:hits (search index query types
-                                                   :from (inc from)
-                                                   :size size))))))}))))))
+                  (if (not= :count type)
+                    {:hits
+                     (lazy-seq
+                       (cons (into [] (doall (for [hit hits] (hit-map hit))))
+                             (if (and lazy (> total-hits hits-collected))
+                               (:hits (:hits (search index query-map types
+                                                     :from (inc from)
+                                                     :size size))))))})))))))
 (defn delete
   "Deletes the document with the specified type and ID from the provided
   index."
