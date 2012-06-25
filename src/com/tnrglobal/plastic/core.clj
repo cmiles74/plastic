@@ -4,6 +4,7 @@
 ;;
 (ns com.tnrglobal.plastic.core
   (:use [cheshire.core])
+  (:require [clojure.java.io :as io])
   (:import [org.elasticsearch.client.transport TransportClient]
            [org.elasticsearch.common.settings ImmutableSettings]
            [org.elasticsearch.common.transport InetSocketTransportAddress]
@@ -59,6 +60,11 @@
   "Returns an IndicesAdminClient."
   []
   (.indices (.admin *CLIENT*)))
+
+(defn cluster-client
+  "Returns a ClusterAdminClient."
+  []
+  (.cluster (.admin *CLIENT*)))
 
 (defn index-response-map
   "Returns a map of the data contained in the provided index
@@ -154,7 +160,9 @@
                           {:analyser
                             {:email_analyzer {:type 'custom'
                                               :tokenizer 'uax_url_email'}}}}
-                        [{'customer' {:email {:type 'string'
+                        [{'customer' {:customer
+                                       {:properties
+                                         {:email {:type 'string'
                                               :store yes
                                               :analyzer 'email_analyzer'}}}])"
   ([name] (create name nil nil))
@@ -206,9 +214,27 @@
 
     http://mvel.codehaus.org/"
   [index type id update-script]
-  (let [request (UpdateRequest. index type id)]
-    (.setScript (generate-smile update-script))
-    (.get (.execute (.update *CLIENT* request)))))
+  (let [request (.prepareUpdate *CLIENT* index type id)]
+
+    ;; set the script
+    (.setScript request (:script update-script))
+
+    ;; set the language
+    (if (:lang update-script)
+      (.setScriptLang request (:lang update-script))
+      (.setScriptLang request "mvel"))
+
+    ;; add our parameters
+    (doall (for [param (:params update-script)]
+             (.addScriptParam request (name (first param)) (second param))))
+
+    ;; fetch and return the result
+    (let [result (.get (.execute request))]
+      {:id (.id result)
+       :index (.index result)
+       :matches (.matches result)
+       :type (.type result)
+       :version (.version result)})))
 
 (defn lazy-scroll
   "Returns a lazy sequnce of the hits for the provided scroll. Returns
@@ -251,6 +277,7 @@
   ([index query-map] (scroll index query-map []))
   ([index query-map types]
      (let [indices (if (coll? index) index [index])
+           types-in (if (coll? types) types [types])
            builder (.prepareSearch *CLIENT* (into-array indices))]
 
        ;; set search type
@@ -271,8 +298,7 @@
        (.setSize builder 10)
 
        ;; handle types
-       (if (seq types)
-         (.setTypes builder (into-array types)))
+       (.setTypes builder (into-array types-in))
 
        ;; return a lazy sequence on the scrolled data
        (let [result (.get (.execute builder))
@@ -319,6 +345,7 @@
                              :or {from 0 size 10 lazy false
                                   type :query-then-fetch}}]
      (let [indices (if (coll? index) index [index])
+           types-in (if (coll? types) types [types])
            builder (.prepareSearch *CLIENT* (into-array indices))]
 
        ;; set our query
@@ -333,8 +360,7 @@
          (.setFacets builder (generate-smile (:filter query-map))))
 
        ;; handle types
-       (if (seq types)
-         (.setTypes builder (into-array types)))
+       (.setTypes builder (into-array types-in))
 
        ;; set search type
        (.setSearchType builder (SEARCH-TYPES type))
@@ -376,14 +402,14 @@
   ([index query] (delete-query index query []))
   ([index query types]
      (let [indices (if (coll? index) index [index])
+           types-in (if (coll? types) types [types])
            builder (.prepareDeleteByQuery *CLIENT* (into-array indices))]
 
        ;; set our query
        (.setQuery builder (generate-smile query))
 
        ;; handle types
-       (if (seq types)
-         (.setTypes builder (into-array types)))
+       (.setTypes builder (into-array types-in))
 
        ;; get our response
        (let [response (.get (.execute builder))]
@@ -392,3 +418,79 @@
                  (map delete-query-map
                       (seq response)))
            {:indices (seq (.getIndices response))})))))
+
+(defn cluster-state-response
+  "Returns a map of the current cluster state as reflected in the
+  provided response."  [response]
+  {:cluster_name (.value (.clusterName response))
+   :indices (into {}
+                  (for [metadata (.getIndices (.getMetaData (.state response)))]
+                    (let [name (.getKey metadata)
+                          data (.getValue metadata)]
+
+                      {name
+                       {:mappings
+                        (into {} (for [mapping (.getMappings data)]
+                                   (parse-string
+                                    (String. (.uncompressed
+                                              (.source (.getValue mapping))))
+                                    true)))
+
+                        :settings
+                        (into {}
+                              (for [[key-in val-in] (.getAsMap
+                                                     (.getSettings data))]
+                                {(keyword key-in) val-in}))}})))})
+
+(defn index-settings
+  "Returns the current settings and mappings for the specified index.."
+  [index-names]
+  (let [client (cluster-client)
+        indices (if (coll? index-names)
+                  (into-array index-names)
+                  (into-array [index-names]))
+        builder (.prepareState client)]
+
+    ;; we don't want everything
+    (doto builder
+      (.setFilterRoutingTable true)
+      (.setFilterNodes true)
+      (.setFilterIndices indices))
+
+    ;; get our response
+    (let [response (.get (.execute builder))]
+      (cluster-state-response response))))
+
+(defn update-index-settings
+  "Updates the settings for the specified indexes with the provided
+  map of data."
+  [index-names settings-map]
+  (let [client (indices-client)
+        indices (if (coll? index-names)
+                  (into-array index-names)
+                  (into-array [index-names]))
+        builder (.prepareUpdateSettings client indices)]
+
+    ;; set our new settings
+    (.setSettings builder (generate-string settings-map))
+
+    ;; get our response
+    (let [response (.get (.execute builder))]
+
+      ;; we fetched the response without issue, see
+      ;; http://bit.ly/M77Qio
+      {:ok true})))
+
+(defn delete-index
+  "Removes the named indexes and returns 'true' if the deletion has
+  been acknowledged by all cluster nodes."
+  [index-names]
+  (let [client (indices-client)
+        indices (if (coll? index-names)
+                  (into-array index-names)
+                  (into-array [index-names]))
+        builder (.prepareDelete client indices)]
+
+    ;; get our response
+    (let [response (.get (.execute builder))]
+      (.acknowledged response))))
