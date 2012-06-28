@@ -2,15 +2,9 @@
 ;; Test suite for the Plastic library.
 ;;
 (ns com.tnrglobal.plastic.test.core
-  (:use [clojure.test]
-        [clojure.tools.logging])
+  (:use [clojure.test])
   (:require [com.tnrglobal.plastic.core :as plastic])
-  (:import [org.elasticsearch.node NodeBuilder]
-           [org.apache.commons.logging LogFactory]
-           [org.apache.commons.logging Log]))
-
-;; logger instance
-(def LOGGER (. LogFactory getLog "plastic.test.core"))
+  (:import [org.elasticsearch.node NodeBuilder]))
 
 (def test-index-def
   [;; settings
@@ -187,8 +181,6 @@
   (testing "Search Data"
     (with-test-data
       (let [results (plastic/search "test" {:query {:match_all {}}})]
-        (info (plastic/fetch "test" "customer" "emily@nervestaple.com"))
-        (info "RESULTS: " results)
         (is (= 6 (:total-hits (:hits results)))))))
 
   (testing "Delete Data"
