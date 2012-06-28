@@ -21,7 +21,7 @@ Installation
 
 To use Plastic, add the following to your project’s “:dependencies”:
 
-[tnrglobal/plastic "0.5"]
+    [tnrglobal/plastic "0.5"]
 
 Creating a New Index
 --------------------
