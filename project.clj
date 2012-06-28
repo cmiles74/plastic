@@ -9,5 +9,6 @@
                                                   javax.jms/jms
                                                   com.sun.jdmk/jmxtools
                                                   com.sun.jmx/jmxri]]
+                     [lein-autodoc "0.9.0"]
                      [swank-clojure/swank-clojure "1.3.3"]]
   :main com.tnrglobal.plastic.core)

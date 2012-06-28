@@ -2,7 +2,9 @@
 ;; Provides functions for managing the Elasticsearch client and other
 ;; related functions.
 ;;
-(ns com.tnrglobal.plastic.core
+(ns ^{:doc "Provides functions that make it easier to work with the
+           Elasticsearch clustered indexer and data store."}
+  com.tnrglobal.plastic.core
   (:use [cheshire.core])
   (:require [clojure.java.io :as io])
   (:import [org.elasticsearch.client.transport TransportClient]
@@ -29,8 +31,7 @@
    :scan SearchType/SCAN})
 
 (defn client
-  "Returns the currently cached Elasticsearch client or creates a new
-  one."
+  "Creates a new Transport Client with the provided settings."
   [cluster-name port nodes]
 
   ;; setup our settings and client
@@ -66,7 +67,7 @@
   []
   (.cluster (.admin *CLIENT*)))
 
-(defn index-response-map
+(defn- index-response-map
   "Returns a map of the data contained in the provided index
   response."
   [index-response]
@@ -76,7 +77,7 @@
    :version (.getVersion index-response)
    :matches (seq (.getMatches index-response))})
 
-(defn search-response-map
+(defn- search-response-map
   "Returns a map of all of the search response data except for the
   hits."
   [response]
@@ -86,16 +87,16 @@
    :status (.status response)
    :successful-shards (.successfulShards response)
    :timed-out (.timedOut response)
-   :tooke (.tookInMillis response)
+   :took (.tookInMillis response)
    :total-shards (.totalShards response)})
 
-(defn hits-map
+(defn- hits-map
   "Returns a map of all the hits response data except for the actual hits."
   [hits]
   {:max-score (.maxScore hits)
    :total-hits (.totalHits hits)})
 
-(defn hit-map
+(defn- hit-map
   "Returns a map of all the data in the provided hit."
   [hit]
   (let [hit-data (parse-smile (.source hit) true)]
@@ -110,7 +111,7 @@
        :sort-values (seq (.sortValues hit))
        :type (.type hit)})))
 
-(defn get-map
+(defn- get-map
   "Returns a map of all the data in the provided get result."
   [get]
   (let [get-data (parse-smile (.source get) true)]
@@ -122,7 +123,7 @@
        :index (.index get)
        :type (.type get)})))
 
-(defn delete-map
+(defn- delete-map
   "Returns a map of all the data in the provided delete result."
   [delete]
   {:index (.index delete)
@@ -131,7 +132,7 @@
    :version (.version delete)
    :type (.type delete)})
 
-(defn delete-query-map
+(defn- delete-query-map
   "Returns a map of all the data in the provided delete query
   result."
   [delete]
@@ -140,6 +141,32 @@
    :successful-shards (.successfulShards delete)
    :total-shards (.totalShards delete)})
 
+(defn- cluster-state-response
+  "Returns a map of the current cluster state as reflected in the
+  provided response. Sadly, much of this data is returned as a map of
+  Strings when integers would be more appropriate. You have been
+  warned."
+  [response]
+  {:cluster_name (.value (.clusterName response))
+   :indices (into {}
+                  (for [metadata (.getIndices (.getMetaData (.state response)))]
+                    (let [name (.getKey metadata)
+                          data (.getValue metadata)]
+
+                      {name
+                       {:mappings
+                        (into {} (for [mapping (.getMappings data)]
+                                   (parse-string
+                                    (String. (.uncompressed
+                                              (.source (.getValue mapping))))
+                                    true)))
+
+                        :settings
+                        (into {}
+                              (for [[key-in val-in] (.getAsMap
+                                                     (.getSettings data))]
+                                {(keyword key-in) val-in}))}})))})
+
 (defn indices-exists?
   "Returns true if all of the named indices exist."
   [indices-in]
@@ -147,6 +174,16 @@
                     (into-array [indices-in]))]
     (.exists (.get (.exists (indices-client)
                             (IndicesExistsRequest. (into-array indices)))))))
+
+(defn wait-for-green
+  "Returns once the provided index has reached the \"green\" health
+  status. You may provide the name of an index or a sequence of index
+  names."
+  [index-names]
+  (.get (.execute (.setWaitForGreenStatus
+                   (.prepareHealth (cluster-client)
+                                   (into-array (if (coll? index-names)
+                                                 index-names [index-names])))))))
 
 (defn create
   "Creates a new index with the provided name and map of settings and
@@ -185,13 +222,32 @@
        (.getAcknowledged (.get (.execute request))))))
 
 (defn index
-  "Indexes the provided map of data. The index and type parameters
-  should be strings, the value in the id parameter will be cast to a
-  String before indexing."
-  [index type id data]
-  (index-response-map
-   (.get (.execute (.setSource (.prepareIndex *CLIENT* index type (str id))
-                               (generate-smile data))))))
+  "Indexes the provided map of data. The index-name and type
+  parameters should be strings, the value in the id parameter will be
+  cast to a String before indexing. If no id parameter is provided,
+  Elasticsearch will generate an id for the item.
+
+  The behvaior of this function may be customized with the following
+  keys.
+
+    :refresh Execute a refresh immediately after indexing, false"
+  ([index-name type data] (index index-name type data nil))
+  ([index-name type data id & {:keys [refresh]
+                               :or [refresh false]}]
+     (index-response-map
+
+      ;; build a new index request
+      (let [request (.prepareIndex *CLIENT* index-name type)]
+
+        ;; set the index data
+        (.setSource request (generate-smile data))
+        (.setRefresh request true)
+
+        ;; set the id , if we have it
+        (if id
+          (.setId request (str id)))
+
+        (.get (.execute request))))))
 
 (defn fetch
   "Fetches the document from the provided index with the specified id."
@@ -223,7 +279,6 @@
     (if (:lang update-script)
       (.setScriptLang request (:lang update-script))
       (.setScriptLang request "mvel"))
-
     ;; add our parameters
     (doall (for [param (:params update-script)]
              (.addScriptParam request (name (first param)) (second param))))
@@ -236,7 +291,21 @@
        :type (.type result)
        :version (.version result)})))
 
-(defn lazy-scroll
+(defn delete-index
+  "Removes the named indexes and returns 'true' if the deletion has
+  been acknowledged by all cluster nodes."
+  [index-names]
+  (let [client (indices-client)
+        indices (if (coll? index-names)
+                  (into-array index-names)
+                  (into-array [index-names]))
+        builder (.prepareDelete client indices)]
+
+    ;; get our response
+    (let [response (.get (.execute builder))]
+      (.acknowledged response))))
+
+(defn- lazy-scroll
   "Returns a lazy sequnce of the hits for the provided scroll. Returns
   a sequence of sequences, each one countaining a page of hits."
   ([scroll-id] (lazy-scroll scroll-id 0))
@@ -258,7 +327,7 @@
                          (lazy-scroll scroll-id num-results)))
 
          ;; we have all of our results, return them
-         (doall (for [hit hits] (parse-smile (.source hit) true)))))))
+         (doall (for [hit hits] (hit-map hit)))))))
 
 (defn scroll
   "Runs the provided query on the specified index, if types are
@@ -273,15 +342,25 @@
 
   Note that when you scroll over a result set, you need to keep the
   client connection open (complete all processing within a
-  '(with-client ...)' form."
+  '(with-client ...)' form.
+
+  This behavior of this function may be customized with the following
+  keys.
+
+    :keep-alive Length of time the scroll lives on the cluster, \"5s\"
+    :size The size of each page of results, 10
+    :type The type of search, :query-then-fetch"
   ([index query-map] (scroll index query-map []))
-  ([index query-map types]
+  ([index query-map types & {:keys [keep-alive size type]
+                             :or {keep-alive "120s"
+                                  size 10
+                                  type :query-then-fetch}}]
      (let [indices (if (coll? index) index [index])
            types-in (if (coll? types) types [types])
            builder (.prepareSearch *CLIENT* (into-array indices))]
 
        ;; set search type
-       (.setScroll builder "120s")
+       (.setScroll builder keep-alive)
 
        ;; set our query
        (.setQuery builder (generate-smile (:query query-map)))
@@ -295,10 +374,14 @@
          (.setFacets builder (generate-smile (:filter query-map))))
 
        ;; set to scroll results
-       (.setSize builder 10)
+       (.setSize builder size)
+
+       ;; set search type
+       (.setSearchType builder (SEARCH-TYPES type))
 
        ;; handle types
-       (.setTypes builder (into-array types-in))
+       (if (seq types-in)
+         (.setTypes builder (into-array types-in)))
 
        ;; return a lazy sequence on the scrolled data
        (let [result (.get (.execute builder))
@@ -316,7 +399,7 @@
                    (lazy-seq (cons
                               (into [] (for [hit hits]
                                          (hit-map hit)))
-                              (lazy-scroll scroll-id (count hits))))}))))))
+                              [(lazy-scroll scroll-id (count hits))]))}))))))
 
 (defn search
   "Runs the provided query on the specified index, if types are
@@ -340,11 +423,14 @@
   provided). Note that when you page over a result set lazily, you
   need to keep the client connection open (complete all processing
   within a '(with-client ...)' form."
-  ([index query-map] (search index query-map []))
-  ([index query-map types & {:keys [from size lazy type]
-                             :or {from 0 size 10 lazy false
-                                  type :query-then-fetch}}]
-     (let [indices (if (coll? index) index [index])
+  ([index-name query-map] (search index-name query-map []))
+  ([index-name query-map types & {:keys [from size lazy type]
+                                  :or {from 0
+                                       size 10
+                                       lazy false
+                                       type :query-then-fetch}}]
+
+     (let [indices (if (coll? index-name) index-name [index-name])
            types-in (if (coll? types) types [types])
            builder (.prepareSearch *CLIENT* (into-array indices))]
 
@@ -360,7 +446,8 @@
          (.setFacets builder (generate-smile (:filter query-map))))
 
        ;; handle types
-       (.setTypes builder (into-array types-in))
+       (if (seq types-in)
+         (.setTypes builder (into-array types-in)))
 
        ;; set search type
        (.setSearchType builder (SEARCH-TYPES type))
@@ -385,22 +472,42 @@
                      (lazy-seq
                        (cons (into [] (doall (for [hit hits] (hit-map hit))))
                              (if (and lazy (> total-hits hits-collected))
-                               (:hits (:hits (search index query-map types
-                                                     :from (inc from)
-                                                     :size size))))))})))))))
+                               (do
+                                 (:hits (:hits (search index-name
+                                                       query-map
+                                                       types
+                                                       :type type
+                                                       :from (+ from size)
+                                                       :size size)))))))})))))))
 (defn delete
   "Deletes the document with the specified type and ID from the provided
-  index."
-  [index type id]
-  (delete-map
-   (.get (.execute (.prepareDelete *CLIENT* index type (str id))))))
+  index.
+
+  The behavior of this function may be customized with the following
+  keys.
+
+    :refresh Executes a refresh after deleting, false"
+  [index type id & {:keys [refresh] :or [refresh false]}]
+  (let [request (.prepareDelete *CLIENT* index type (str id))]
+
+    ;; handle refreshes
+    (if refresh
+      (.setRefresh request true))
+
+    (delete-map (.get (.execute request)))))
 
 (defn delete-query
   "Runs the provided query on the specified index and deletes all of
   the matching documents. If types are provided then only documents
-  with a matching type will be deleted."
+  with a matching type will be deleted.
+
+  Note that because there isn't any faceting or sorting, this function
+  expects a query in the form {:term {:name \"Joe\"}}, queries in the
+  form {:query {:term {:name \"Joe\"}}} will fail."
   ([index query] (delete-query index query []))
-  ([index query types]
+  ([index query types & {:keys [refresh]
+                         :or [refresh false]}]
+
      (let [indices (if (coll? index) index [index])
            types-in (if (coll? types) types [types])
            builder (.prepareDeleteByQuery *CLIENT* (into-array indices))]
@@ -418,29 +525,6 @@
                  (map delete-query-map
                       (seq response)))
            {:indices (seq (.getIndices response))})))))
-
-(defn cluster-state-response
-  "Returns a map of the current cluster state as reflected in the
-  provided response."  [response]
-  {:cluster_name (.value (.clusterName response))
-   :indices (into {}
-                  (for [metadata (.getIndices (.getMetaData (.state response)))]
-                    (let [name (.getKey metadata)
-                          data (.getValue metadata)]
-
-                      {name
-                       {:mappings
-                        (into {} (for [mapping (.getMappings data)]
-                                   (parse-string
-                                    (String. (.uncompressed
-                                              (.source (.getValue mapping))))
-                                    true)))
-
-                        :settings
-                        (into {}
-                              (for [[key-in val-in] (.getAsMap
-                                                     (.getSettings data))]
-                                {(keyword key-in) val-in}))}})))})
 
 (defn index-settings
   "Returns the current settings and mappings for the specified index.."
@@ -463,7 +547,7 @@
 
 (defn update-index-settings
   "Updates the settings for the specified indexes with the provided
-  map of data."
+  map of data. Returns true if the update was successfully enacted."
   [index-names settings-map]
   (let [client (indices-client)
         indices (if (coll? index-names)
@@ -479,17 +563,26 @@
 
       ;; we fetched the response without issue, see
       ;; http://bit.ly/M77Qio
-      {:ok true})))
+      true)))
 
-(defn delete-index
-  "Removes the named indexes and returns 'true' if the deletion has
-  been acknowledged by all cluster nodes."
-  [index-names]
+(defn update-index-mapping
+  "Updates the mapping for the specified indexes with the provided map
+  of data. The provided map of data should include only one type
+  mapping. Returns true if the update was successfully enacted. A
+  sample mapping follows.
+
+  {:thing1 {:properties {:name {:type \"string\"
+                                :index \"not_analyzed\"}}}}"
+  [index-names mapping]
   (let [client (indices-client)
         indices (if (coll? index-names)
                   (into-array index-names)
                   (into-array [index-names]))
-        builder (.prepareDelete client indices)]
+        builder (.preparePutMapping client indices)]
+
+    ;; set our new settings
+    (.setType builder (name (first (keys mapping))))
+    (.setSource builder (generate-string mapping))
 
     ;; get our response
     (let [response (.get (.execute builder))]

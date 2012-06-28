@@ -11,3 +11,6 @@ docs
 *~
 .lein-*
 *.log
+autodoc
+data
+target
