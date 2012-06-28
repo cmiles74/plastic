@@ -16,6 +16,13 @@ We're currently using this library in several projects and are
 committed to improving the library and adding additional
 functionality. Stay tuned for more updates.
 
+Installation
+------------
+
+To use Plastic, add the following to your project’s “:dependencies”:
+
+[tnrglobal/plastic "0.5"]
+
 Creating a New Index
 --------------------
 
