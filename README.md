@@ -16,6 +16,9 @@ We're currently using this library in several projects and are
 committed to improving the library and adding additional
 functionality. Stay tuned for more updates.
 
+[Function documentation](http://cmiles74.github.com/plastic/) is also
+available for this project.
+
 Installation
 ------------
 
@@ -78,4 +81,6 @@ Searching is, of course, a breeze.
 
 Those are just the basics, I'll add more documentation as I get to
 it. For now, take a look at the
-[unit tests](https://github.com/cmiles74/plastic/blob/master/test/com/tnrglobal/plastic/test/core.clj).
+[unit tests](https://github.com/cmiles74/plastic/blob/master/test/com/tnrglobal/plastic/test/core.clj)
+and check out our
+[function documentation](http://cmiles74.github.com/plastic/).
