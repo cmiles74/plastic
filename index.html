@@ -1,0 +1,423 @@
+<html>
+  <head>
+    <title>com.tnrglobal.plastic.core - plastic API documentation</title>
+    <link href="static/favicon.png" rel="icon" />
+    <link href="static/favicon.png" rel="shortcut icon" />
+    <link media="all" type="text/css" href="static/clojure.css" rel="stylesheet" />
+    <link media="all" type="text/css" href="static/wiki.css" rel="stylesheet" />
+    <link media="all" type="text/css" href="static/internal.css" rel="stylesheet" />
+    <style>.menuWrapper{height: 36px;}</style>
+    <!--[if lte IE 6]>
+    <link rel="stylesheet" href="http://www.wikispaces.com/_/2009051601/s/internal_ie.css" type="text/css" />
+    <![endif]-->
+  </head>
+<!--
+This document was auto-generated from the source by the clojure autodoc system.
+To report errors or ask questions about the overall documentation structure, formatting,
+etc., contact Tom Faulhaber (google mail name: tomfaulhaber).
+For errors in the documentation of a particular namespace, contact the author of that
+namespace.
+-->
+  <body>
+    <div id="AllContentContainer">
+      <div id="Header">
+	<a id="Logo" href="index.html"><img alt="Clojure" height="100" width="100" src="static/clojure-icon.gif" /></a>
+	<h1><a title="page header title" id="page-header" href="index.html">plastic</a></h1>
+      </div>
+      <div id="leftcolumn"><div style="text-align: center;"></div>
+<div class="menu">
+  <div class="WikiCustomNav WikiElement wiki">
+    <span class="toc-header"><span id="project-name">plastic</span> <span id="version"></span> API</span><br />
+    <ul>
+      <li><a class="wiki_link" href="index.html">Overview</a></li>
+      <li><a class="wiki_link" href="api-index.html">API Index</a></li>
+    </ul>
+    
+    
+    <a href="http://clojure.org" class="wiki_link">Clojure Home</a>
+  </div>
+</div>
+</div>
+      <div id="rightcolumn">
+	<div id="Content">
+	  <div class="contentBox"><div class="innerContentBox">
+              <div id="content_view" class="wiki wikiPage">
+                <div id="right-sidebar"><div id="toc">
+  <h1 class="nopad">Table of Contents</h1>
+  <div style="margin-left: 1em;" class="toc-section">
+    <a href="#toc0">Overview</a>
+    <div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/client">client</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/cluster-client">cluster-client</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/create">create</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/delete">delete</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/delete-index">delete-index</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/delete-query">delete-query</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/fetch">fetch</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/index">index</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/index-settings">index-settings</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/indices-client">indices-client</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/indices-exists?">indices-exists?</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/scroll">scroll</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/search">search</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/update">update</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/update-index-mapping">update-index-mapping</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/update-index-settings">update-index-settings</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/wait-for-green">wait-for-green</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#com.tnrglobal.plastic.core/with-client">with-client</a>
+    </div>
+    <br />
+  </div>
+</div>
+</div>
+                <div id="content-tag"><h1 id="overview">API for <span id="namespace-name">com.tnrglobal.plastic.core</span>
+  - <span id="header-project">plastic</span> <span id="header-version"></span>
+  </h1>
+
+<br />Full namespace name: <span id="long-name">com.tnrglobal.plastic.core</span>
+<p></p>
+<h2>Overview</h2>
+<pre id="namespace-docstr">Provides functions that make it easier to work with the
+Elasticsearch clustered indexer and data store.</pre>
+
+
+<br />
+<h2>Public Variables and Functions</h2>
+<div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/client">client</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (client cluster-name port nodes)
+</pre>
+  <pre id="var-docstr">Creates a new Transport Client with the provided settings.</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/cluster-client">cluster-client</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (cluster-client)
+</pre>
+  <pre id="var-docstr">Returns a ClusterAdminClient.</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/create">create</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (create name)
+       (create name settings)
+       (create name settings mappings)
+</pre>
+  <pre id="var-docstr">Creates a new index with the provided name and map of settings and
+sequence of mappings (each mapping should have one key representing
+the type and a map containing the mapping data. Returns false if the
+creation failed.
+
+Here's an example:
+
+(create-index 'index' {:analysis
+                        {:analyser
+                          {:email_analyzer {:type 'custom'
+                                            :tokenizer 'uax_url_email'}}}}
+                      [{'customer' {:customer
+                                     {:properties
+                                       {:email {:type 'string'
+                                            :store yes
+                                            :analyzer 'email_analyzer'}}}])</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/delete">delete</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (delete index type id &amp; {:keys [refresh], :or [refresh false]})
+</pre>
+  <pre id="var-docstr">Deletes the document with the specified type and ID from the provided
+index.
+
+The behavior of this function may be customized with the following
+keys.
+
+  :refresh Executes a refresh after deleting, false</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/delete-index">delete-index</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (delete-index index-names)
+</pre>
+  <pre id="var-docstr">Removes the named indexes and returns 'true' if the deletion has
+been acknowledged by all cluster nodes.</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/delete-query">delete-query</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (delete-query index query)
+       (delete-query index query types &amp; {:keys [refresh], :or [refresh false]})
+</pre>
+  <pre id="var-docstr">Runs the provided query on the specified index and deletes all of
+the matching documents. If types are provided then only documents
+with a matching type will be deleted.
+
+Note that because there isn't any faceting or sorting, this function
+expects a query in the form {:term {:name "Joe"}}, queries in the
+form {:query {:term {:name "Joe"}}} will fail.</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/fetch">fetch</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (fetch index type id)
+</pre>
+  <pre id="var-docstr">Fetches the document from the provided index with the specified id.</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/index">index</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (index index-name type data)
+       (index index-name type data id &amp; {:keys [refresh], :or [refresh false]})
+</pre>
+  <pre id="var-docstr">Indexes the provided map of data. The index-name and type
+parameters should be strings, the value in the id parameter will be
+cast to a String before indexing. If no id parameter is provided,
+Elasticsearch will generate an id for the item.
+
+The behvaior of this function may be customized with the following
+keys.
+
+  :refresh Execute a refresh immediately after indexing, false</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/index-settings">index-settings</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (index-settings index-names)
+</pre>
+  <pre id="var-docstr">Returns the current settings and mappings for the specified index..</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/indices-client">indices-client</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (indices-client)
+</pre>
+  <pre id="var-docstr">Returns an IndicesAdminClient.</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/indices-exists?">indices-exists?</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (indices-exists? indices-in)
+</pre>
+  <pre id="var-docstr">Returns true if all of the named indices exist.</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/scroll">scroll</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (scroll index query-map)
+       (scroll index query-map types &amp; {:keys [keep-alive size type], :or {keep-alive 120s, size 10, type :query-then-fetch}})
+</pre>
+  <pre id="var-docstr">Runs the provided query on the specified index, if types are
+specified then only documents with a matching type will be
+returned. The query is represent by a map, it may contain the
+following keys: 'query', 'facets', and 'filter'. This function will
+open a 'scroll' on the Elasticsearch cluster, the sequence stored
+under the :hits key will be lazy. By default the results are
+provided in pages of ten, in the :hits map under the :hits key
+contains a sequence and each document in the sequence will be ten
+documents long or less.
+
+Note that when you scroll over a result set, you need to keep the
+client connection open (complete all processing within a
+'(with-client ...)' form.
+
+This behavior of this function may be customized with the following
+keys.
+
+  :keep-alive Length of time the scroll lives on the cluster, "5s"
+  :size The size of each page of results, 10
+  :type The type of search, :query-then-fetch</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/search">search</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (search index-name query-map)
+       (search index-name query-map types &amp; {:keys [from size lazy type], :or {from 0, size 10, lazy false, type :query-then-fetch}})
+</pre>
+  <pre id="var-docstr">Runs the provided query on the specified index, if types are
+specified then only documents with a matching type will be
+returned. The query is represent by a map, it may contain the
+following keys: 'query', 'facets', and 'filter'. Each key should
+contain a map value. By default the results are provided in pages of
+ten, in the :hits map under the :hits key contains a sequence and
+each document in the sequence will be ten documents long or
+less. You may provide a map of optional values, these include...
+
+  :size  The size of result pages, defaults to 10
+  :from  The page of results from which hits will be returned
+  :lazy  Setting this loads only one page lazily, false
+  :type  The type of search, a key into SEARCH-TYPES map
+
+This function will handle paging automatically, returning a lazy
+sequence under the :hits key. By default this function will fetch
+results ten at a time, set the :lazy key to false to load only the
+specified :from page (0 is assumed if no :from page is
+provided). Note that when you page over a result set lazily, you
+need to keep the client connection open (complete all processing
+within a '(with-client ...)' form.</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/update">update</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (update index type id update-script)
+</pre>
+  <pre id="var-docstr">Updates the document in the specified index with the provided type and
+id with the update script map. This effectively performs a merge of
+the document and the map and then re-indexes the full document. Note
+that the update-script is *not* Clojure code, this should be an MVEL
+script.
+
+  {:script 'ctx._source.counter += count'
+   :params {:count 1}}
+
+The update-script map above will increment the counter field of the
+target document.
+
+  <a href="http://mvel.codehaus.org/">http://mvel.codehaus.org/</a></pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/update-index-mapping">update-index-mapping</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (update-index-mapping index-names mapping)
+</pre>
+  <pre id="var-docstr">Updates the mapping for the specified indexes with the provided map
+of data. The provided map of data should include only one type
+mapping. Returns true if the update was successfully enacted. A
+sample mapping follows.
+
+{:thing1 {:properties {:name {:type "string"
+                              :index "not_analyzed"}}}}</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/update-index-settings">update-index-settings</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (update-index-settings index-names settings-map)
+</pre>
+  <pre id="var-docstr">Updates the settings for the specified indexes with the provided
+map of data. Returns true if the update was successfully enacted.</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/wait-for-green">wait-for-green</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (wait-for-green index-names)
+</pre>
+  <pre id="var-docstr">Returns once the provided index has reached the "green" health
+status. You may provide the name of an index or a sequence of index
+names.</pre>
+  
+  
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="com.tnrglobal.plastic.core/with-client">with-client</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (with-client client &amp; body)
+</pre>
+  <pre id="var-docstr">Evaluates the provided forms in the context of the specified
+Elasticsearch client. When the evaluation is complete, the
+Elasticsearch client is closed.</pre>
+  
+  
+  
+</div>
+
+
+</div>
+              </div>
+            </div>
+          </div>
+	</div>
+	<div id="foot">
+	  <div style="text-align: center;" id="copyright">No copyright info </div>
+	</div>
+      </div>
+      <div id="DesignedBy">Logo &amp; site design by <a title="Visit Tom Hickey's website." href="http://www.tomhickey.com">Tom Hickey</a>.<br />
+      Clojure auto-documentation system by Tom Faulhaber.</div>
+    </div>
+    <!-- /AllContentContainer -->
+  </body>
+
+</html>
