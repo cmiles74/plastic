@@ -233,7 +233,7 @@
     :refresh Execute a refresh immediately after indexing, false"
   ([index-name type data] (index index-name type data nil))
   ([index-name type data id & {:keys [refresh]
-                               :or [refresh false]}]
+                               :or {refresh false}}]
      (index-response-map
 
       ;; build a new index request
@@ -487,7 +487,7 @@
   keys.
 
     :refresh Executes a refresh after deleting, false"
-  [index type id & {:keys [refresh] :or [refresh false]}]
+  [index type id & {:keys [refresh] :or {refresh false}}]
   (let [request (.prepareDelete *CLIENT* index type (str id))]
 
     ;; handle refreshes
@@ -506,7 +506,7 @@
   form {:query {:term {:name \"Joe\"}}} will fail."
   ([index query] (delete-query index query []))
   ([index query types & {:keys [refresh]
-                         :or [refresh false]}]
+                         :or {refresh false}}]
 
      (let [indices (if (coll? index) index [index])
            types-in (if (coll? types) types [types])
