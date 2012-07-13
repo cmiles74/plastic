@@ -1,4 +1,4 @@
-(defproject tnrglobal/plastic "0.5.1"
+(defproject tnrglobal/plastic "0.5.2"
   :Description "A library to ease development with Elasticsearch"
   :dependencies [[org.clojure/clojure "1.3.0"]
                  [org.elasticsearch/elasticsearch "0.19.4"]

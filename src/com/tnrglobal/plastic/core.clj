@@ -359,19 +359,11 @@
            types-in (if (coll? types) types [types])
            builder (.prepareSearch *CLIENT* (into-array indices))]
 
+       ;; set our query
+       (.setSource builder (generate-smile query-map))
+
        ;; set search type
        (.setScroll builder keep-alive)
-
-       ;; set our query
-       (.setQuery builder (generate-smile (:query query-map)))
-
-       ;; set facets
-       (if (:facets query-map)
-         (.setFacets builder (generate-smile (:facets query-map))))
-
-       ;; set filter
-       (if (:filter query-map)
-         (.setFacets builder (generate-smile (:filter query-map))))
 
        ;; set to scroll results
        (.setSize builder size)
@@ -435,15 +427,7 @@
            builder (.prepareSearch *CLIENT* (into-array indices))]
 
        ;; set our query
-       (.setQuery builder (generate-smile (:query query-map)))
-
-       ;; set facets
-       (if (:facets query-map)
-         (.setFacets builder (generate-smile (:facets query-map))))
-
-       ;; set filter
-       (if (:filter query-map)
-         (.setFacets builder (generate-smile (:filter query-map))))
+       (.setSource builder (generate-smile query-map))
 
        ;; handle types
        (if (seq types-in)
