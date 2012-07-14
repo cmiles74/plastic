@@ -216,7 +216,6 @@
                                    {:query {:match_all {}}}
                                    "customer"
                                    :size 2)]
-
         (is (and (not (realized? (:hits (:hits result))))
                  (= 2 (count (first (:hits (:hits result)))))
                  (= 1 (count (second (:hits (:hits result))))))))))

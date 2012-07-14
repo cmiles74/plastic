@@ -16,7 +16,10 @@
            [org.elasticsearch.action.index IndexRequest]
            [org.elasticsearch.action.update UpdateRequest]
            [org.elasticsearch.action.search SearchRequest]
-           [org.elasticsearch.action.search SearchScrollRequest]))
+           [org.elasticsearch.action.search SearchScrollRequest]
+           [org.elasticsearch.search Scroll]
+           [org.elasticsearch.search.builder SearchSourceBuilder]
+           [org.elasticsearch.common.unit TimeValue]))
 
 ;; Elasticsearch client
 (def ^:dynamic *CLIENT* nil)
@@ -307,27 +310,31 @@
 
 (defn- lazy-scroll
   "Returns a lazy sequnce of the hits for the provided scroll. Returns
-  a sequence of sequences, each one countaining a page of hits."
-  ([scroll-id] (lazy-scroll scroll-id 0))
-  ([scroll-id num-results-in]
+  a sequence of sequences, each one countaining a page of hits. The
+  \"keep-alive\" value should be a valid TimeValue."
+  ([scroll-id keep-alive] (lazy-scroll scroll-id keep-alive 0))
+  ([scroll-id keep-alive num-results-in]
 
      ;; get the next batch of hits
-     (let [response (.get (.execute
-                           (.prepareSearchScroll *CLIENT* scroll-id)))
-           hits (.hits response)
-           total-hits (.totalHits hits)
-           count-hits (count (.hits hits))
-           num-results (+ num-results-in count-hits)]
+     (let [request (.prepareSearchScroll *CLIENT* scroll-id)]
 
-       ;; do we have all of the hits available?
-       (if (> total-hits num-results)
+       (.setScroll request keep-alive)
+       (let [response (.get (.execute request))
+             scroll-id-new (.scrollId response)
+             hits (.hits response)
+             total-hits (.totalHits hits)
+             count-hits (count (.hits hits))
+             num-results (+ num-results-in count-hits)]
 
-         ;; recurse to get more results
-         (lazy-seq (cons (into [] (doall (for [hit hits] (hit-map hit))))
-                         (lazy-scroll scroll-id num-results)))
+         ;; do we have all of the hits available?
+         (if (> total-hits num-results)
 
-         ;; we have all of our results, return them
-         (doall (for [hit hits] (hit-map hit)))))))
+           ;; recurse to get more results
+           (lazy-seq (cons (for [hit hits] (hit-map hit))
+                           (lazy-scroll scroll-id-new keep-alive num-results)))
+
+           ;; we have all of our results, return them
+           [(for [hit hits] (hit-map hit))])))))
 
 (defn scroll
   "Runs the provided query on the specified index, if types are
@@ -357,26 +364,31 @@
                                   type :query-then-fetch}}]
      (let [indices (if (coll? index) index [index])
            types-in (if (coll? types) types [types])
-           builder (.prepareSearch *CLIENT* (into-array indices))]
+           builder (SearchSourceBuilder. )
+           request (SearchRequest. (into-array indices))
+           time-value (Scroll. (TimeValue/parseTimeValue keep-alive nil))]
 
        ;; set our query
-       (.setSource builder (generate-smile query-map))
-
-       ;; set search type
-       (.setScroll builder keep-alive)
-
-       ;; set to scroll results
-       (.setSize builder size)
-
-       ;; set search type
-       (.setSearchType builder (SEARCH-TYPES type))
+       (.source request (generate-smile query-map))
 
        ;; handle types
        (if (seq types-in)
-         (.setTypes builder (into-array types-in)))
+         (.types request (into-array types-in)))
+
+       ;; set search type
+       (.searchType request (SEARCH-TYPES type))
+
+       ;; set search type
+       (.scroll request time-value)
+
+       ;; set our size
+       (.size builder size)
+
+       ;; pass our builder to our search request
+       (.extraSource request builder)
 
        ;; return a lazy sequence on the scrolled data
-       (let [result (.get (.execute builder))
+       (let [result (.get (.search *CLIENT* request))
              scroll-id (.scrollId result)
              hits (.hits (.hits result))]
 
@@ -389,9 +401,10 @@
                   ;; sequence of hits)
                   {:hits
                    (lazy-seq (cons
-                              (into [] (for [hit hits]
-                                         (hit-map hit)))
-                              [(lazy-scroll scroll-id (count hits))]))}))))))
+                              (for [hit hits] (hit-map hit))
+                              (lazy-scroll scroll-id
+                                           time-value
+                                           (count hits))))}))))))
 
 (defn search
   "Runs the provided query on the specified index, if types are
@@ -424,23 +437,27 @@
 
      (let [indices (if (coll? index-name) index-name [index-name])
            types-in (if (coll? types) types [types])
-           builder (.prepareSearch *CLIENT* (into-array indices))]
+           builder (SearchSourceBuilder. )
+           request (SearchRequest. (into-array indices))]
 
        ;; set our query
-       (.setSource builder (generate-smile query-map))
+       (.source request (generate-smile query-map))
 
        ;; handle types
        (if (seq types-in)
-         (.setTypes builder (into-array types-in)))
+         (.types request (into-array types-in)))
 
        ;; set search type
-       (.setSearchType builder (SEARCH-TYPES type))
+       (.searchType request (SEARCH-TYPES type))
 
        ;; set our size and page
-       (.setSize builder size)
-       (if from (.setFrom builder from))
+       (.size builder size)
+       (if from (.from builder from))
 
-       (let [result (.get (.execute builder))
+       ;; pass our builder to our search request
+       (.extraSource request builder)
+
+       (let [result (.get (.search *CLIENT* request))
              total-hits (.totalHits (.hits result))
              hits (.hits (.hits result))
              hits-collected (+ (count hits) (* from size))]
