@@ -19,6 +19,8 @@
            [org.elasticsearch.action.search SearchScrollRequest]
            [org.elasticsearch.search Scroll]
            [org.elasticsearch.search.builder SearchSourceBuilder]
+           [org.elasticsearch.action.delete DeleteRequestBuilder]
+           [org.elasticsearch.action.index IndexRequestBuilder]
            [org.elasticsearch.common.unit TimeValue]))
 
 ;; Elasticsearch client
@@ -588,3 +590,72 @@
     ;; get our response
     (let [response (.get (.execute builder))]
       (.acknowledged response))))
+
+(defn bulk
+  "Perform a bulk operation. The 'operations' should be a sequence and
+  each item in the sequence represents an operation and it's
+  associated data.
+
+   [[:index \"peope\" \"person\" {:name \"Joe Test\" :age 23} 101]
+    [:index \"peope\" \"person\" {:name \"Fred Fake\" :age 56} 102]]
+
+  Each operation is specified with a keyword (:index or :delete),
+  followed by the parameters for that operation.
+
+  INDEX operations take the following parameters:
+
+  *  The name of the index
+  *  The name of the document's type
+  *  A map representing the document
+  *  Optional: the unique identifier for the document
+
+  DELETE operations take the following parameters:
+
+  *  The name of the index
+  *  The name of the document's type
+  *  The unique identifier of the document to delete
+
+  The behavior of this function may be customized with the following
+  keys.
+
+    :refresh Executes a refresh after the operations, false"
+
+ [operations & {:keys [refresh] :or {refresh false}}]
+
+  ;; setup our bulk request
+  (let [request (.prepareBulk *CLIENT*)]
+
+    ;; set the refresh status
+    (.setRefresh request refresh)
+
+    ;; load in our operations
+    (dorun
+     (map (fn [operation]
+            (cond
+
+              ;; add an index operatio
+              (= :index (first operation))
+              (let [op-request (IndexRequestBuilder. *CLIENT*
+                                                     (nth operation 1))]
+                (doto op-request
+                  (.setType (nth operation 2))
+                  (.setSource (generate-smile (nth operation 3))))
+
+                (if (= 5 (count operation))
+                  (.setId op-request (nth operation 4)))
+
+                (.add request op-request))
+
+              ;; add a delete operation
+              (= :delete (first operation))
+              (let [op-request (DeleteRequestBuilder. *CLIENT*
+                                                      (nth operation 1))]
+                (doto op-request
+                  (.setType (nth operation 2))
+                  (.setId (nth operation 3)))
+
+                (.add request op-request))))
+          operations))
+
+    ;; execute our bulk request
+    (.get (.execute request))))

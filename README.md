@@ -28,7 +28,7 @@ Installation
 
 To use Plastic, add the following to your project’s “:dependencies”:
 
-    [tnrglobal/plastic "0.5.2"]
+    [tnrglobal/plastic "0.5.3"]
 
 As of this writing, Plastic works (and has been tested against)
 [Elasticsearch 0.19.4](http://www.elasticsearch.org/blog/2012/05/21/0.19.4-released.html). This

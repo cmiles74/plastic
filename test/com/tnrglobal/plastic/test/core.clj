@@ -230,7 +230,58 @@
 
         (is (and (not (realized? (:hits (:hits result))))
                  (= 2 (count (first (:hits (:hits result)))))
-                 (= 1 (count (second (:hits (:hits result)))))))))))
+                 (= 1 (count (second (:hits (:hits result))))))))))
+
+  (testing "Bulk Index"
+    (with-test-index
+      (let [result (plastic/bulk
+                    [[:index "test" "customer"
+                      {:name "Christopher Miles"
+                       :email "twitch@nervestaple.com"
+                       :age 38}
+                      "100"]
+                     [:index "test" "customer"
+                      {:name "Joanna Miles"
+                       :email "jadler.miles@gmail.com"
+                       :age 36}
+                      "101"]
+                     [:index "test" "customer"
+                      {:name "Emily Miles"
+                       :email "emily@nervestaple.com"
+                       :id "emily@nervestaple.com"
+                       :age 1}
+                      "102"]]
+                    :refresh true)
+            results (plastic/search "test" {:query {:match_all {}}})]
+        (is (= 3 (:total-hits (:hits results)))))))
+
+  (testing "Bulk Index and Delete"
+    (with-test-index
+      (let [index-result (plastic/bulk
+                          [[:index "test" "customer"
+                            {:name "Christopher Miles"
+                             :email "twitch@nervestaple.com"
+                             :age 38}
+                            "100"]
+                           [:index "test" "customer"
+                            {:name "Joanna Miles"
+                             :email "jadler.miles@gmail.com"
+                             :age 36}
+                            "101"]
+                           [:index "test" "customer"
+                            {:name "Emily Miles"
+                             :email "emily@nervestaple.com"
+                             :id "emily@nervestaple.com"
+                             :age 1}
+                            "102"]]
+                          :refresh true)
+            delete-result (plastic/bulk
+                           [[:delete "test" "customer" "100"]
+                            [:delete "test" "customer" "101"]
+                            [:delete "test" "customer" "102"]]
+                           :refresh true)
+            results (plastic/search "test" {:query {:match_all {}}})]
+        (is (= 0 (:total-hits (:hits results))))))))
 
 (deftest metadata
 
